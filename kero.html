@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keroppi's Lily Pad Adventure 🐸</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            background: linear-gradient(to bottom, #87CEEB 0%, #98D8C8 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+        }
+
+        h1 {
+            color: #4CAF50;
+            font-size: 2em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        #canvas {
+            border: 4px solid #4CAF50;
+            border-radius: 10px;
+            background: linear-gradient(to bottom, #87CEEB 0%, #B4E7CE 50%, #8BC34A 100%);
+            cursor: none;
+            display: block;
+            margin: 20px auto;
+        }
+
+        #score {
+            font-size: 1.5em;
+            color: #2E7D32;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        #gameOver {
+            display: none;
+            margin-top: 20px;
+        }
+
+        #restartBtn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            border-radius: 25px;
+            cursor: pointer;
+            font-family: 'Comic Sans MS', cursive;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s;
+        }
+
+        #restartBtn:hover {
+            background: #45a049;
+            transform: scale(1.05);
+        }
+
+        .message {
+            color: #FF69B4;
+            font-size: 1.1em;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+
+        .hearts {
+            font-size: 1.5em;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <h1>🐸 Keroppi's Adventure 🐸</h1>
+        <p class="message">Aide Keroppi à attraper les nénuphars ! 💚</p>
+        <div id="score">Score: 0</div>
+        <div class="hearts">❤️❤️❤️</div>
+        <canvas id="canvas" width="500" height="400"></canvas>
+        <div id="gameOver">
+            <h2 style="color: #FF69B4;">Partie terminée !</h2>
+            <p style="font-size: 1.2em; margin: 10px 0;">Score final: <span id="finalScore">0</span></p>
+            <button id="restartBtn">Rejouer 🎮</button>
+        </div>
+        <p style="color: #666; margin-top: 10px; font-size: 0.9em;">Déplace Keroppi avec ta souris !</p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let score = 0;
+        let lives = 3;
+        let gameRunning = true;
+        let mouseX = canvas.width / 2;
+
+        // Keroppi (joueur)
+        const keroppi = {
+            x: canvas.width / 2,
+            y: canvas.height - 60,
+            width: 60,
+            height: 50,
+            speed: 8
+        };
+
+        // Nénuphars qui tombent
+        let lilyPads = [];
+        let bombPads = [];
+        let lastSpawn = 0;
+        let spawnInterval = 1500;
+
+        // Dessiner Keroppi
+        function drawKeroppi() {
+            // Corps de Keroppi (grenouille verte)
+            ctx.fillStyle = '#4CAF50';
+            ctx.beginPath();
+            ctx.ellipse(keroppi.x, keroppi.y, keroppi.width / 2, keroppi.height / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Yeux blancs
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(keroppi.x - 15, keroppi.y - 10, 12, 0, Math.PI * 2);
+            ctx.arc(keroppi.x + 15, keroppi.y - 10, 12, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pupilles
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(keroppi.x - 15, keroppi.y - 10, 6, 0, Math.PI * 2);
+            ctx.arc(keroppi.x + 15, keroppi.y - 10, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Sourire
+            ctx.strokeStyle = '#2E7D32';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(keroppi.x, keroppi.y + 5, 15, 0, Math.PI);
+            ctx.stroke();
+
+            // Joues roses
+            ctx.fillStyle = 'rgba(255, 105, 180, 0.4)';
+            ctx.beginPath();
+            ctx.arc(keroppi.x - 25, keroppi.y + 5, 8, 0, Math.PI * 2);
+            ctx.arc(keroppi.x + 25, keroppi.y + 5, 8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Dessiner un nénuphar
+        function drawLilyPad(x, y, isBomb = false) {
+            ctx.fillStyle = isBomb ? '#FF6B6B' : '#81C784';
+            ctx.beginPath();
+            ctx.ellipse(x, y, 25, 20, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = isBomb ? '#FF4444' : '#66BB6A';
+            ctx.beginPath();
+            ctx.ellipse(x, y, 20, 15, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (isBomb) {
+                ctx.fillStyle = 'white';
+                ctx.font = '20px Arial';
+                ctx.fillText('💣', x - 10, y + 8);
+            } else {
+                ctx.fillStyle = 'white';
+                ctx.font = '16px Arial';
+                ctx.fillText('🌸', x - 8, y + 6);
+            }
+        }
+
+        // Créer un nénuphar
+        function spawnLilyPad() {
+            const isBomb = Math.random() < 0.2; // 20% de chance d'être une bombe
+            const pad = {
+                x: Math.random() * (canvas.width - 50) + 25,
+                y: -20,
+                speed: 2 + Math.random() * 2,
+                isBomb: isBomb
+            };
+            
+            if (isBomb) {
+                bombPads.push(pad);
+            } else {
+                lilyPads.push(pad);
+            }
+        }
+
+        // Vérifier les collisions
+        function checkCollision(pad) {
+            return Math.abs(pad.x - keroppi.x) < 40 && 
+                   Math.abs(pad.y - keroppi.y) < 35;
+        }
+
+        // Mettre à jour le jeu
+        function update(timestamp) {
+            if (!gameRunning) return;
+
+            // Effacer le canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Déplacer Keroppi vers la souris
+            if (Math.abs(mouseX - keroppi.x) > 5) {
+                if (mouseX < keroppi.x) {
+                    keroppi.x -= keroppi.speed;
+                } else {
+                    keroppi.x += keroppi.speed;
+                }
+            }
+
+            // Limiter Keroppi au canvas
+            keroppi.x = Math.max(30, Math.min(canvas.width - 30, keroppi.x));
+
+            // Spawn de nouveaux nénuphars
+            if (timestamp - lastSpawn > spawnInterval) {
+                spawnLilyPad();
+                lastSpawn = timestamp;
+                spawnInterval = Math.max(800, spawnInterval - 10);
+            }
+
+            // Mettre à jour et dessiner les nénuphars
+            lilyPads = lilyPads.filter(pad => {
+                pad.y += pad.speed;
+                drawLilyPad(pad.x, pad.y);
+
+                if (checkCollision(pad)) {
+                    score += 10;
+                    document.getElementById('score').textContent = 'Score: ' + score;
+                    return false;
+                }
+
+                if (pad.y > canvas.height) {
+                    lives--;
+                    updateLives();
+                    return false;
+                }
+
+                return true;
+            });
+
+            // Mettre à jour et dessiner les bombes
+            bombPads = bombPads.filter(pad => {
+                pad.y += pad.speed;
+                drawLilyPad(pad.x, pad.y, true);
+
+                if (checkCollision(pad)) {
+                    lives--;
+                    updateLives();
+                    return false;
+                }
+
+                return pad.y < canvas.height;
+            });
+
+            drawKeroppi();
+
+            if (lives <= 0) {
+                endGame();
+            } else {
+                requestAnimationFrame(update);
+            }
+        }
+
+        // Mettre à jour l'affichage des vies
+        function updateLives() {
+            const heartsDiv = document.querySelector('.hearts');
+            heartsDiv.textContent = '❤️'.repeat(lives);
+        }
+
+        // Fin du jeu
+        function endGame() {
+            gameRunning = false;
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('gameOver').style.display = 'block';
+        }
+
+        // Redémarrer le jeu
+        function restartGame() {
+            score = 0;
+            lives = 3;
+            gameRunning = true;
+            lilyPads = [];
+            bombPads = [];
+            lastSpawn = 0;
+            spawnInterval = 1500;
+            keroppi.x = canvas.width / 2;
+            
+            document.getElementById('score').textContent = 'Score: 0';
+            updateLives();
+            document.getElementById('gameOver').style.display = 'none';
+            
+            requestAnimationFrame(update);
+        }
+
+        // Suivre la souris
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+        });
+
+        // Bouton restart
+        document.getElementById('restartBtn').addEventListener('click', restartGame);
+
+        // Démarrer le jeu
+        requestAnimationFrame(update);
+    </script>
+</body>
+</html>
